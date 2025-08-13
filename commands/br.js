@@ -18,6 +18,7 @@ class Player {
         this.alive = true;
         this.weapons = [];
         this.currentZone = null;
+        this.lastDiscoveryMessage = '';
     }
 
     takeDamage(amount) {
@@ -34,21 +35,109 @@ class Player {
     }
 };
 
+const SPECIALS = {
+    golden_gun: {
+        name: 'Golden Gun',
+        discovery: (player) => `a Golden Gun`,
+        attack: (player, defender, round) => {
+            defender.takeDamage(100); // Insta-kill
+            return `<@${player.id}> lands a one-shot elimination on <@${defender.id}> with the Golden Gun!`;
+        }
+    },
+    ring_controller: {
+        name: 'Ring Controller',
+        discovery: (player) => `a Ring Controller`,
+        attack: (player, defender, round) => {
+            const damage = 15 * round;
+            defender.takeDamage(damage);
+            // Also damages the attacker slightly, as it's unstable
+            player.takeDamage(5 * round);
+            return `<@${player.id}> uses the Ring Controller to call down a localized storm on <@${defender.id}>!`;
+        }
+    },
+    jetpack: {
+        name: 'Jetpack',
+        discovery: (player) => `a Jetpack`,
+        attack: (player, defender, round) => {
+            const damage = 12 * round;
+            defender.takeDamage(damage);
+            return `<@${player.id}> uses the Jetpack to perform a death-from-above slam on <@${defender.id}>!`;
+        }
+    },
+    elp_banhammer: {
+        name: 'Elps Banhammer',
+        discovery: (player) => `Elps Banhammer`,
+        attack: (player, defender, round) => {
+            defender.takeDamage(50); // Insta-kill
+            return `<@${player.id}> uses Elps banhammer to obliterate <@${defender.id}>. 50HP is reduced!`;
+        }
+    },
+    tistle_tuba: {
+        name: 'Tistle Tuba',
+        discovery: (player) => `Tistles Tuba`,
+        attack: (player, defender, round) => {
+            defender.takeDamage(11 * round); // Insta-kill
+            return `<@${player.id}> starts playing Tistles Tuba in front of <@${defender.id}> and hypnotizes them.`;
+        }
+    },
+    beasto: {
+        name: 'Beasto',
+        discovery: (player) => `a wild Beasto`,
+        attack: (player, defender, round) => {
+            defender.takeDamage(100); // Insta-kill
+            return `<@${player.id}> tells Beasto to creepily simp on <@${defender.id}>. They insantly die of cringe. RIP`;
+        }
+    },
+
+};
+
+const HEALS = {
+
+    berry: {
+        discovery: function(player){
+            player.heal(30);
+            return `<@${player.id}> found a wild berry and healed themselves!`;
+        }
+    },
+
+    curry: {
+        discovery: function(player){
+            player.heal(40);
+            return `<@${player.id}> found a bowl of spicy yet soothing curry. It insantly makes them feel better.`;
+        }
+    },
+
+    krabby: {
+        discovery: function(player){
+            player.heal(35);
+            return `<@${player.id}> steals Krabby when Herbert isn't looking. They cook it and enjoy the meal peacefully.`;
+        }
+    },
+
+    promotion: {
+        discovery: function(player){
+            player.heal(30);
+            return `<@${player.id}> gets promoted in Help Force. The ego boost heals a part of them.`;
+        }
+    },
+};
+
 const ZONES = {
 
     iceberg: {
-        name: 'iceberg',
+        name: 'Iceberg',
 
         loot: {
 
             snowball: {
+                name: 'Snowball',
                 discovery: function(player){
                     return `<@${player.id}> found a snowball.`;
 
                 },
 
                 attack: function(player, defender, round){
-                    const damage = 3 * round;
+                    const damage = 5 * round;
                     defender.takeDamage(damage);
 
                     return `<@${player.id}> hit <@${defender.id}> with a snowball!`;
@@ -57,9 +146,10 @@ const ZONES = {
             },
 
             fishing_rod: {
+                name: 'Fishing Rod',
                 discovery: (player) => `<@${player.id}> snatched a fishing rod from Herbert's stash! 🎣`,
                 attack: (player, defender, round) => {
-                    const damage = 5 * round;
+                    const damage = 7 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> hooks <@${defender.id}> for ${damage} damage!`;
                 }
@@ -70,19 +160,21 @@ const ZONES = {
     },
 
     cove: {
-        name: 'cove',
+        name: 'Cove',
         loot: {
             // COMMON: "Soggy Cannonball" (From Shipwrecks)
             cannonball: {
+                name: 'Cannon Ball',
                 discovery: (player) => `<@${player.id}> dug up a waterlogged cannonball! 💦`,
                 attack: (player, defender, round) => {
-                    const damage = 4 * round;
+                    const damage = 6 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> launches a cannonball at <@${defender.id}>! Sploosh!`;
                 }
             },
             // RARE: "Captain's Cutlass" (From Cap'n Smol)
             cutlass: {
+                name: 'Cutlass',
                 discovery: (player) => `<@${player.id}> stole Cap'n Smol's prized cutlass! ⚔️`,
                 attack: (player, defender, round) => {
                     const damage = 7 * round;
@@ -94,20 +186,23 @@ const ZONES = {
     },
 
     mines: {
-        name: 'mines',
+        name: 'Mines',
 
         loot: {
             // COMMON: "Pickaxe" (Mining tool)
+
             pickaxe: {
+                name: 'Pickaxe',
                 discovery: (player) => `<@${player.id}> found a rusty pickaxe! ⛏️`,
                 attack: (player, defender, round) => {
-                    const damage = 3 * round;
+                    const damage = 5 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> cracks <@${defender.id}> with a pickaxe!`;
                 }
             },
             // RARE: "Golden Nugget" (Ultra-rare rock)
             golden_nugget: {
+                name: 'Golden Nugget',
                 discovery: (player) => `<@${player.id}> struck gold! 💛`,
                 attack: (player, defender, round) => {
                     const damage = 8 * round;
@@ -119,19 +214,21 @@ const ZONES = {
     },
 
     forest: {
-        name: 'forest',
+        name: 'Forest',
         loot: {
             // COMMON: "Puffle Berry" (From bushes)
             puffle_berry: {
+                name: 'Puffle Berry',
                 discovery: (player) => `<@${player.id}> found a toxic puffle berry! 🍇`,
                 attack: (player, defender, round) => {
-                    const damage = 2 * round;
+                    const damage = 6 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> flings a berry at <@${defender.id}>. They look queasy!`;
                 }
             },
             // RARE: "Puffle Whistle" (Summon wild puffles)
             puffle_whistle: {
+                name: 'Puffle Whistle',
                 discovery: (player) => `<@${player.id}> found the legendary Puffle Whistle! 📯`,
                 attack: (player, defender, round) => {
                     const damage = 6 * round;
@@ -143,22 +240,24 @@ const ZONES = {
     },
 
     stadium: {
-        name: 'stadium',
+        name: 'Stadium',
         loot: {
             // COMMON: "Hockey Stick" (From hockey minigame)
             hockey_stick: {
+                name: 'Hockey Stick',
                 discovery: (player) => `<@${player.id}> grabbed a hockey stick! 🏒`,
                 attack: (player, defender, round) => {
-                    const damage = 4 * round;
+                    const damage = 7 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> slaps <@${defender.id}> with the stick! *Clack!*`;
                 }
             },
             // RARE: "Soccer Ball Bomb" (From PSA missions)
             soccer_bomb: {
+                name: 'Soccer Bomb',
                 discovery: (player) => `<@${player.id}> found a suspicious soccer ball... 💣`,
                 attack: (player, defender, round) => {
-                    const damage = 9 * round;
+                    const damage = 8 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> kicks the ball at <@${defender.id}>—it explodes! 💥`;
                 }
@@ -167,10 +266,11 @@ const ZONES = {
     },
 
     plaza: {
-        name: 'plaza',
+        name: 'Plaza',
         loot: {
             // COMMON: "Pizza Box" (From Pizza Parlor)
             pizza_box: {
+                name: 'Pizza Box',
                 discovery: (player) => `<@${player.id}> found a stale pizza box! 🍕`,
                 attack: (player, defender, round) => {
                     const damage = 3 * round;
@@ -180,9 +280,10 @@ const ZONES = {
             },
             // RARE: "Dance Floor Bomb" (From Dance Contest)
             dance_bomb: {
+                name: 'Dance Bomb',
                 discovery: (player) => `<@${player.id}> found a disco ball bomb! 💃`,
                 attack: (player, defender, round) => {
-                    const damage = 7 * round;
+                    const damage = 9 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> throws the bomb—<@${defender.id}> gets blasted by glitter! ✨`;
                 }
@@ -191,19 +292,21 @@ const ZONES = {
     },
 
     town: {
-        name: 'town',
+        name: 'Town',
         loot: {
             // COMMON: "Newspaper Roll" (From the CP Times)
             newspaper: {
+                name: 'Newspaper',
                 discovery: (player) => `<@${player.id}> grabbed a rolled-up newspaper! 📰`,
                 attack: (player, defender, round) => {
-                    const damage = 3 * round;
+                    const damage = 4 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> whacks <@${defender.id}> with the newspaper! *"Extra! Extra!"*`;
                 }
             },
             // RARE: "Gavel of Justice" (From the PSA HQ)
             gavel: {
+                name: 'Gavel',
                 discovery: (player) => `<@${player.id}> found the PSA's golden gavel! ⚖️`,
                 attack: (player, defender, round) => {
                     const damage = 8 * round;
@@ -215,19 +318,21 @@ const ZONES = {
     },
 
     docks: {
-        name: 'docks',
+        name: 'Docks',
         loot: {
             // COMMON: "Rusty Anchor" (From the shipwreck)
             anchor: {
+                name: 'Anchor',
                 discovery: (player) => `<@${player.id}> dragged up a tiny anchor! ⚓`,
                 attack: (player, defender, round) => {
-                    const damage = 4 * round;
+                    const damage = 5 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> crushes <@${defender.id}> with the anchor! *"Heavy!"*`;
                 }
             },
             // RARE: "Treasure Map Trap" (From Herbert's stash)
             treasure_map: {
+                name: 'Treasure Map',
                 discovery: (player) => `<@${player.id}> unrolled a map... it's a trap! 🗺️💥`,
                 attack: (player, defender, round) => {
                     const damage = 7 * round;
@@ -239,22 +344,24 @@ const ZONES = {
     },
 
     beach: {
-        name: 'beach',
+        name: 'Beach',
         loot: {
             // COMMON: "Sandy Shovel" (From building sandcastles)
             shovel: {
+                name: 'Shovel',
                 discovery: (player) => `<@${player.id}> picked up a sandy shovel! 🏝️`,
                 attack: (player, defender, round) => {
-                    const damage = 3 * round;
+                    const damage = 8 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> bonks <@${defender.id}> with the shovel. Sand flies everywhere!`;
                 }
             },
             // RARE: "Crab Cannon" (From the Jet Pack Adventure)
             crab_cannon: {
+                name: 'Crab Cannon',
                 discovery: (player) => `<@${player.id}> found a crab-powered cannon! 🦀🔫`,
                 attack: (player, defender, round) => {
-                    const damage = 6 * round;
+                    const damage = 8 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> fires a crab at <@${defender.id}>! *Pinch!*`;
                 }
@@ -263,22 +370,24 @@ const ZONES = {
     },
 
     snowforts: {
-        name: 'snowforts',
+        name: 'Snowforts',
         loot: {
             // COMMON: "Ice Block" (From fort walls)
             ice_block: {
+                name: 'Ice Block',
                 discovery: (player) => `<@${player.id}> pried loose a frozen ice block! 🧊`,
                 attack: (player, defender, round) => {
-                    const damage = 4 * round;
+                    const damage = 3 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> drops the block on <@${defender.id}>! *CRUNCH*`;
                 }
             },
             // RARE: "Snow Cannon" (From the Snowball Battle minigame)
             snow_cannon: {
+                name: 'Snow Cannon',
                 discovery: (player) => `<@${player.id}> commandeered a snow cannon! ❄️💣`,
                 attack: (player, defender, round) => {
-                    const damage = 9 * round;
+                    const damage = 10 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> blasts <@${defender.id}> with a mega snowball!`;
                 }
@@ -287,10 +396,11 @@ const ZONES = {
     },
 
     skihill: {
-        name: 'skihill',
+        name: 'Skihill',
         loot: {
             // COMMON: "Ski Pole" (From the slopes)
             ski_pole: {
+                name: 'Ski Pole',
                 discovery: (player) => `<@${player.id}> snapped a ski pole in half! 🎿`,
                 attack: (player, defender, round) => {
                     const damage = 3 * round;
@@ -300,6 +410,7 @@ const ZONES = {
             },
             // RARE: "Yeti Sled" (From the Mountain Expedition)
             yeti_sled: {
+                name: 'Yeti Sled',
                 discovery: (player) => `<@${player.id}> found the Yeti's stolen sled! 🛷`,
                 attack: (player, defender, round) => {
                     const damage = 10 * round;
@@ -311,10 +422,11 @@ const ZONES = {
     },
 
     dojo: {
-        name: 'dojo',
+        name: 'Dojo',
         loot: {
             // COMMON: "Bamboo Staff" (From training dummies)
             bamboo_staff: {
+                name: 'Bamboo Staff',
                 discovery: (player) => `<@${player.id}> grabbed a bamboo staff! 🎋`,
                 attack: (player, defender, round) => {
                     const damage = 5 * round;
@@ -324,11 +436,116 @@ const ZONES = {
             },
             // RARE: "Dragon Scroll" (From Sensei’s secret stash)
             dragon_scroll: {
+                name: 'Dragon Scroll',
                 discovery: (player) => `<@${player.id}> unrolled the forbidden Dragon Scroll! 🐉📜`,
                 attack: (player, defender, round) => {
                     const damage = 12 * round;
                     defender.takeDamage(damage);
                     return `<@${player.id}> unleashes the scroll's power—<@${defender.id}> is engulfed in flames! 🔥`;
+                }
+            }
+        }
+    },
+
+    coffeeshop: {
+        name: 'Coffee Shop',
+        loot: {
+            // COMMON: "Coffee Mug"
+            coffee_mug: {
+                name: 'Coffee Mug',
+                discovery: (player) => `<@${player.id}> grabbed a hot coffee mug! ☕`,
+                attack: (player, defender, round) => {
+                    const damage = 6 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> throws hot coffee at <@${defender.id}>! It's super effective!`;
+                }
+            },
+            // RARE: "Espresso Tamper"
+            espresso_tamper: {
+                name: 'Espresso Tamper',
+                discovery: (player) => `<@${player.id}> found a heavy espresso tamper behind the counter!`,
+                attack: (player, defender, round) => {
+                    const damage = 7 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> smashes <@${defender.id}> with the espresso tamper! That's gotta hurt.`;
+                }
+            }
+        }
+    },
+    
+    pizzaparlor: {
+        name: 'Pizza Parlor',
+        loot: {
+            // COMMON: "Pizza Cutter"
+            pizza_cutter: {
+                name: 'Pizza Cutter',
+                discovery: (player) => `<@${player.id}> found a surprisingly sharp pizza cutter! 🍕`,
+                attack: (player, defender, round) => {
+                    const damage = 8 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> rolls the pizza cutter over <@${defender.id}>! "One slice or two?"`;
+                }
+            },
+            // RARE: "Exploding Calzone"
+            exploding_calzone: {
+                name: 'Exploding Calzone',
+                discovery: (player) => `<@${player.id}> found a suspiciously ticking calzone... 💣`,
+                attack: (player, defender, round) => {
+                    const damage = 9 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> tosses the calzone at <@${defender.id}>—it explodes in a cheesy mess! 💥`;
+                }
+            }
+        }
+    },
+    
+    boxdimension: {
+        name: 'Box Dimension',
+        loot: {
+            // COMMON: "Cardboard Tube"
+            cardboard_tube: {
+                name: 'Cardboard Tube',
+                discovery: (player) => `<@${player.id}> found a sturdy cardboard tube! 📦`,
+                attack: (player, defender, round) => {
+                    const damage = 5 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> bonks <@${defender.id}> with the cardboard tube! *thwack*`;
+                }
+            },
+            // RARE: "Reality Glitch"
+            reality_glitch: {
+                name: 'Reality Glitch',
+                discovery: (player) => `<@${player.id}> touched a weird-looking box and found a reality glitch! 🌀`,
+                attack: (player, defender, round) => {
+                    const damage = 10 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> uses the glitch on <@${defender.id}>, causing them to briefly phase out of existence!`;
+                }
+            }
+        }
+    },
+    
+    lighthouse: {
+        name: 'Lighthouse',
+        loot: {
+            // COMMON: "Signal Lantern"
+            signal_lantern: {
+                name: 'Signal Lantern',
+                discovery: (player) => `<@${player.id}> grabbed a heavy signal lantern! 💡`,
+                attack: (player, defender, round) => {
+                    const damage = 6 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> swings the lantern at <@${defender.id}>! *Clang!*`;
+                }
+            },
+            // RARE: "Lighthouse Beam"
+            lighthouse_beam: {
+                name: 'Lighthouse Beam',
+                discovery: (player) => `<@${player.id}> figured out how to control the lighthouse beam! 🔆`,
+                attack: (player, defender, round) => {
+                    const damage = 8 * round;
+                    defender.takeDamage(damage);
+                    return `<@${player.id}> focuses the intense lighthouse beam on <@${defender.id}>, searing them!`;
                 }
             }
         }
@@ -342,7 +559,7 @@ const ZONES = {
 class BattleRoyale {
     constructor(hoster){
         this.squads = new Map();
-        this.safeZones = ['plaza', 'forest', 'stadium', 'cove', 'town', 'snowforts', 'skihill', 'dojo']; //'town', 'snowforts', 'skihill', 'dojo', 'beach', 'docks', 'mines', 'iceberg
+        this.safeZones = ['plaza', 'forest', 'stadium', 'cove', 'town', 'snowforts', 'skihill', 'dojo', 'coffeeshop', 'pizzaparlor', 'lighthouse', 'boxdimension']; //'town', 'snowforts', 'skihill', 'dojo', 'beach', 'docks', 'mines', 'iceberg
         this.dangerZones = [];
         this.collectors = [];
         this.ring = 0;
@@ -389,6 +606,7 @@ class BattleRoyale {
     
             // Move all squads to the final showdown zone
             this.squads.forEach((squad, squadId) => {
+                squad.inDanger = true; 
                 squad.players.forEach(player => {
                     player.currentZone = this.finalShowdown;
                 });
@@ -399,11 +617,13 @@ class BattleRoyale {
     
         // Normal allocation (80/20 split)
         this.squads.forEach((squad, squadId) => {
-            const isDangerSquad = Math.random() < 0.2; // 20% chance
+            const isDangerSquad = Math.random() < 0.15; // 20% chance
             
             const targetZone = isDangerSquad && this.dangerZones.length > 0
                 ? this.dangerZones[Math.floor(Math.random() * this.dangerZones.length)]
                 : this.safeZones[Math.floor(Math.random() * this.safeZones.length)];
+
+                squad.inDanger = isDangerSquad && this.dangerZones.length > 0;
     
             squad.players.forEach(player => {
                 player.currentZone = targetZone;
@@ -430,13 +650,10 @@ class BattleRoyale {
     
         // Create the embed
         const lobbyEmbed = new EmbedBuilder()
-            .setTitle('**Battle Royale Lobby**')
+            .setTitle('**HG Battle Royale Lobby** 🔮')
             .setColor('#00FF00')
-            .setDescription(`Waiting for players... (${this.players.size}/16`)
-            .addFields(squadFields)
-            .setFooter({
-                text: `React with 🎮 to join | Host: <@${this.hoster}>`,
-            });
+            .setDescription(`Waiting for players... (${this.players.size}/16)`)
+            .addFields(squadFields);
     
         // Edit the original message
         try {
@@ -474,31 +691,76 @@ class BattleRoyale {
     }
 
     discoveryPhase() {
-
-        const weaponAssignments = [];
-        // First filter alive players
         const alivePlayers = Array.from(this.players.values()).filter(player => player.alive);
-        
-        // Then process only alive players
+    
         alivePlayers.forEach(player => {
-          const zone = ZONES[player.currentZone];
-          const lootKeys = Object.keys(zone.loot);
-          const randomWeaponKey = lootKeys[Math.floor(Math.random() * lootKeys.length)];
-          const weapon = zone.loot[randomWeaponKey];
-      
-          // Push the complete weapon object with all methods
-          player.weapons.push({
-            ...weapon,
-            id: randomWeaponKey  // Optional: add weapon ID for reference
-          });
-      
+            player.lastDiscoveryMessage = '';
+            const isInDangerZone = this.dangerZones.includes(player.currentZone);
+    
+            // --- DANGER ZONE LOGIC ---
+            if (isInDangerZone && this.safeZones.length > 1) {
+                player.takeDamage(30);
+                let discoveryMessage = `The ring closes in on <@${player.id}>, dealing 30 damage!`;
+    
+                // 50% chance to find a special weapon
+                if (Math.random() < 0.5) {
+                    const specialKeys = Object.keys(SPECIALS);
+                    const randomSpecialKey = specialKeys[Math.floor(Math.random() * specialKeys.length)];
+                    const specialWeapon = SPECIALS[randomSpecialKey];
+    
+                    player.weapons.push({
+                        ...specialWeapon,
+                        id: randomSpecialKey
+                    });
+    
+                    // Append the discovery to the message
+                    discoveryMessage += ` But in the chaos, they found ${specialWeapon.discovery(player)}!`;
+                } else {
+                    // Append the failure message
+                    discoveryMessage += ` They searched but found nothing of value.`;
+                }
+                
+                player.lastDiscoveryMessage = discoveryMessage;
+    
+            } 
+            // --- SAFE ZONE LOGIC ---
+            else {
+                // 25% chance to find a heal
+                if (Math.random() < 0.2) {
+                    const healKeys = Object.keys(HEALS);
+                    const randomHealKey = healKeys[Math.floor(Math.random() * healKeys.length)];
+                    const heal = HEALS[randomHealKey];
+                    player.lastDiscoveryMessage = heal.discovery(player);
+                } 
+                // 75% chance to find a normal weapon
+                else {
+                    const zone = ZONES[player.currentZone];
+                    if (zone && zone.loot) {
+                        const lootKeys = Object.keys(zone.loot);
+                        if (lootKeys.length > 0) {
+                            const randomWeaponKey = lootKeys[Math.floor(Math.random() * lootKeys.length)];
+                            const weapon = zone.loot[randomWeaponKey];
+    
+                            player.weapons.push({
+                                ...weapon,
+                                id: randomWeaponKey
+                            });
+                            player.lastDiscoveryMessage = weapon.discovery(player);
+                        } else {
+                            player.lastDiscoveryMessage = `<@${player.id}> found nothing!`;
+                        }
+                    } else {
+                        player.lastDiscoveryMessage = `<@${player.id}> found nothing!`;
+                    }
+                }
+            }
         });
-      }
+    }
 
     deathMessage(casualties) {
 
         const description = casualties.length > 0
-        ? `☠️ The fallen:\n${casualties.map(id => `• <@${id}>`).join('\n')}`
+        ? `${casualties.map(id => `${id}`).join('\n')}`
         : '✨ No tributes died today.'; // Fallback for empty array
 
         const deathEmbed = new EmbedBuilder()
@@ -517,7 +779,7 @@ class BattleRoyale {
           return {
             name: `${squad.name} (${alivePlayers.length} alive)`,
             value: alivePlayers.map(player => 
-              `• <@${player.id}>: ${player.health} HP ${player.weapons.length > 0 ? '| ' + player.weapons.map(w => w.id).join(', ') : ''}`
+              `• <@${player.id}>: ${player.health} HP ${player.weapons.length > 0 ? '| ' + player.weapons.map(w => w.name).join(', ') : ''}`
             ).join('\n') || 'No living members',
             inline: false
           };
@@ -525,13 +787,12 @@ class BattleRoyale {
       
         // Create the embed
         const statsEmbed = new EmbedBuilder()
-          .setTitle('**Battle Royale Stats**')
+          .setTitle('**HG Battle Royale Stats** ⏳')
           .setColor('#ff0000') // Red color for stats
           .addFields(squadFields)
           .setFooter({
-            text: `Safe Zones: ${this.safeZones.join(', ')} | Total Alive: ${this.getAliveCount()}`,
-          })
-          .setTimestamp();
+            text: `Safe Zones: ${this.safeZones.map(zoneKey => ZONES[zoneKey].name).join(', ')}`,
+        })
       
         return statsEmbed;
       }
@@ -543,9 +804,9 @@ class BattleRoyale {
 
     async battlePhase() {
         console.log('[BATTLE PHASE STARTED] Round:', this.ring);
-        const battleLog = [];
-        const zoneBattles = {};
         const casualties = [];
+        const descriptionLines = [];
+        const hidingSquadsLog = [];
     
         // 1. Group squads by zone
         const squadsByZone = new Map();
@@ -571,18 +832,8 @@ class BattleRoyale {
             }
         });
     
-        // Log zone distribution
-        console.log('\nZone Distribution:');
-        squadsByZone.forEach((squads, zone) => {
-            console.log(`- ${zone}: ${squads.length} squad(s)`);
-            squads.forEach(squad => {
-                console.log(`  - ${squad.name} (${squad.players.length} players)`);
-            });
-        });
-    
         // 2. Check for battles
         let battlesOccurred = false;
-        console.log('\nChecking for battles...');
         
         squadsByZone.forEach((squads, zone) => {
             if (squads.length >= 2) {
@@ -590,8 +841,8 @@ class BattleRoyale {
                 console.log(`! BATTLE DETECTED in ${zone} (${squads.length} squads)`);
                 
                 const zoneLog = [];
-                zoneBattles[zone] = zoneLog;
-                zoneLog.push(`**${zone.toUpperCase()} BATTLE**`);
+                //zoneBattles[zone] = zoneLog;
+                //zoneLog.push(`**${zone.toUpperCase()} BATTLE**`);
     
                 // Handle odd number of squads
                 const shuffledSquads = [...squads].sort(() => Math.random() - 0.5);
@@ -599,7 +850,7 @@ class BattleRoyale {
                 // 2. Handle odd squad count (now random)
                 if (shuffledSquads.length % 2 !== 0) {
                     const hidingSquad = shuffledSquads.pop(); // Removes a RANDOM squad (due to shuffle)
-                    zoneLog.push(`• ${hidingSquad.name} hid and avoided combat!`);
+                    hidingSquadsLog.push(`• ${hidingSquad.name} hid and avoided combat!`);
                     console.log(`  - ${hidingSquad.name} randomly hid (odd squad count)`);
                 }
     
@@ -607,52 +858,71 @@ class BattleRoyale {
                 while (shuffledSquads.length > 0) {
                     const squad1 = shuffledSquads.shift();
                     const squad2 = shuffledSquads.shift();
-                    console.log(`  - MATCHUP: ${squad1.name} vs ${squad2.name}`);
-
+                    
                     const shuffledFighters1 = [...squad1.players].sort(() => 0.5 - Math.random());
                     const shuffledFighters2 = [...squad2.players].sort(() => 0.5 - Math.random());
-                    console.log(`    - ${squad1.name} combatants: ${shuffledFighters1.length}`);
-                    console.log(`    - ${squad2.name} combatants: ${shuffledFighters2.length}`);
     
-                    // 1v1 battles
                     const numBattles = Math.min(shuffledFighters1.length, shuffledFighters2.length);
-                    console.log(`    - Executing ${numBattles} 1v1 battles`);
                     
                     for (let i = 0; i < numBattles; i++) {
-                        const attacker = shuffledFighters1[i];
-                        const defender = shuffledFighters2[i];
-                        console.log(`    - BATTLE ${i+1}: ${attacker.id} vs ${defender.id}`);
+                        const player1 = shuffledFighters1[i];
+                        const player2 = shuffledFighters2[i];
     
-                        if (attacker.weapons.length > 0) {
-                            const weapon1 = attacker.weapons[Math.floor(Math.random() * attacker.weapons.length)];
-                            const weapon2 = defender.weapons[Math.floor(Math.random() * attacker.weapons.length)];
-
-                            console.log(`      - ${attacker.id} using ${weapon1.id}`);
+                        // --- START OF NEW COMBAT LOGIC ---
+    
+                        // Store alive status BEFORE combat to prevent duplicate casualty entries
+                        const player1WasAlive = player1.alive;
+                        const player2WasAlive = player2.alive;
+    
+                        const player1HasWeapon = player1.weapons.length > 0;
+                        const player2HasWeapon = player2.weapons.length > 0;
+    
+                        // Scenario 1: Both players have weapons and fight simultaneously
+                        if (player1HasWeapon && player2HasWeapon) {
+                            const weapon1 = player1.weapons[Math.floor(Math.random() * player1.weapons.length)];
+                            // Bug Fix: Use player2's weapon length, not player1's
+                            const weapon2 = player2.weapons[Math.floor(Math.random() * player2.weapons.length)];
+    
+                            const attackResult1 = weapon1.attack(player1, player2, this.ring);
+                            const attackResult2 = weapon2.attack(player2, player1, this.ring);
                             
-                            const attackResult1 = weapon1.attack(attacker, defender, this.ring);
-                            const attackResult2 = weapon2.attack(defender, attacker, this.ring);
                             zoneLog.push(`⚔️ ${attackResult1}`);
                             zoneLog.push(`⚔️ ${attackResult2}`);
-                            console.log(`      - ATTACK RESULT: ${attackResult1}`);
-    
-                            if (defender.health <= 0) {
-                                defender.alive = false;
-                                casualties.push(`☠️ <@${defender.id}> was eliminated!`);
-                                console.log(`      - ELIMINATION: ${defender.id}`);
-                            }
-
-                            if (attacker.health <= 0) {
-                                attacker.alive = false;
-                                casualties.push(`☠️ <@${attacker.id}> was eliminated!`);
-                                console.log(`      - ELIMINATION: ${attacker.id}`);
-                            }
-
-
-                        } else {
-                            zoneLog.push(`🫥 <@${attacker.id}> had no weapons to attack!`);
-                            console.log(`      - NO WEAPONS: ${attacker.id} couldn't attack`);
+                        } 
+                        // Scenario 2: Only Player 1 has a weapon
+                        else if (player1HasWeapon && !player2HasWeapon) {
+                            const weapon1 = player1.weapons[Math.floor(Math.random() * player1.weapons.length)];
+                            const attackResult1 = weapon1.attack(player1, player2, this.ring);
+                            zoneLog.push(`⚔️ ${attackResult1}`);
+                            zoneLog.push(`Unarmed <@${player2.id}> couldn't fight back!`);
                         }
+                        // Scenario 3: Only Player 2 has a weapon
+                        else if (!player1HasWeapon && player2HasWeapon) {
+                            const weapon2 = player2.weapons[Math.floor(Math.random() * player2.weapons.length)];
+                            const attackResult2 = weapon2.attack(player2, player1, this.ring);
+                            zoneLog.push(`⚔️ ${attackResult2}`);
+                            zoneLog.push(`Unarmed <@${player1.id}> couldn't fight back!`);
+                        }
+                        // Scenario 4: Neither player has a weapon
+                        else {
+                            zoneLog.push(`🥊 <@${player1.id}> and <@${player2.id}> stared at each other menacingly, but had no weapons!`);
+                        }
+    
+                        // Check for casualties AFTER all combat is resolved
+                        if (player1WasAlive && !player1.alive) {
+                            casualties.push(`☠️ <@${player1.id}>`);
+                        }
+                        if (player2WasAlive && !player2.alive) {
+                            casualties.push(`☠️ <@${player2.id}>`);
+                        }
+                        // --- END OF NEW COMBAT LOGIC ---
                     }
+                }
+
+                // If any battles happened in this zone, add the formatted block to the main description
+                if (zoneLog.length > 0) {
+                    descriptionLines.push(`\n__**${ZONES[zone]?.name.toUpperCase() || zone.toUpperCase()}**__\n`);
+                    descriptionLines.push(...zoneLog);
                 }
             }
         });
@@ -664,17 +934,19 @@ class BattleRoyale {
                 battleEmbed: new EmbedBuilder()
                     .setTitle("**🌿 Peaceful Round**")
                     .setDescription(squadsByZone.size > 1 
-                        ? "Squads stayed in separate zones" 
-                        : "All squads avoided conflict")
-                    .addFields({
-                        name: "Safe Zones",
-                        value: this.safeZones.join(", ")
-                    }),
+                        ? "Squads stayed in separate zones..." 
+                        : "All squads avoided conflict...")
+                    .setFooter({
+                        text: `Safe Zones: ${this.safeZones.map(zoneKey => ZONES[zoneKey].name).join(', ')}`,
+                        }),
                 casualties: []
             };
         }
+
+        const finalDescription = (hidingSquadsLog.length > 0 ? hidingSquadsLog.join('\n') + '\n' : '') + descriptionLines.join('\n');
+
     
-        // 3. Create battle embed
+        /*// 3. Create battle embed
         console.log('\nCreating battle embed...');
         const battleEmbed = new EmbedBuilder()
         .setTitle(`**Ring ${this.ring} Battle Results**`)
@@ -690,7 +962,12 @@ class BattleRoyale {
                 inline: false
             });
         }
-    });
+    });*/
+
+    const battleEmbed = new EmbedBuilder()
+        .setTitle(`**Ring ${this.ring} Battle Results**`)
+        .setColor('#FF0000')
+        .setDescription(finalDescription);
 
     // Ensure at least one field exists
     if (battleEmbed.data.fields?.length === 0) {
@@ -709,50 +986,77 @@ class BattleRoyale {
     
         console.log('[BATTLE PHASE COMPLETE]');
         return {
-            battleLog,
             battleEmbed,  // Now guaranteed valid
             casualties
         };
     }
 
     checkWinner(interaction) {
-        // First compute alive squads efficiently
-        const aliveSquads = [...this.squads.values()].filter(squad => 
+        const formatWeaponList = (player) => {
+            if (player.weapons.length > 0) {
+                return player.weapons.map(w => w.name.charAt(0).toUpperCase() + w.name.slice(1)).join(', ');
+            }
+            return 'Bare hands';
+        };
+    
+        const aliveSquads = [...this.squads.values()].filter(squad =>
             squad.players.some(p => p.alive)
         );
-        
-        // Squad victory (even if only 1 player remains)
+    
+        // --- SQUAD VICTORY ---
         if (aliveSquads.length === 1) {
             const winningSquad = aliveSquads[0];
-            const aliveCount = winningSquad.players.filter(p => p.alive).length;
-            
+            const survivors = winningSquad.players.filter(p => p.alive);
             const winnerEmbed = new EmbedBuilder()
-                .setTitle("**Battle Royale Champion!**")
-                .setDescription(`🏆 ${winningSquad.name} wins with ${aliveCount} survivor${aliveCount > 1 ? 's' : ''}!`)
-                .setColor(0x953d59)
-                .setThumbnail(winningSquad.players.find(p => p.alive)?.avatar || ozzyAvatarURL);
-            
+                .setTitle("🏆 **Battle Royale Champion!**")
+                .setColor(0xFFD700); // Gold color for victory
+    
+            // --- Case 1: Two survivors ---
+            if (survivors.length === 2) {
+                const player1 = survivors[0];
+                const player2 = survivors[1];
+                const description = `**${winningSquad.name}** wins the Hunger Games with 2 survivors! 🥳\n\n` +
+                                    `• <@${player1.id}> - ${formatWeaponList(player1)}\n` +
+                                    `• <@${player2.id}> - ${formatWeaponList(player2)}`;
+    
+                winnerEmbed
+                    .setDescription(description)
+                    .setThumbnail(player1.avatar); // Discord Limitation: Can only show one thumbnail.
+    
+            } 
+            // --- Case 2: One survivor ---
+            else if (survivors.length === 1) {
+                const soloSurvivor = survivors[0];
+                const description = `**${winningSquad.name}** wins the Hunger Games!\n\n` +
+                                    `**<@${soloSurvivor.id}>** is the sole survivor with their trusty **${formatWeaponList(soloSurvivor)}**!`;
+    
+                winnerEmbed
+                    .setTitle("HG Battle Royale Champion!")
+                    .setDescription(description)
+                    .setThumbnail(soloSurvivor.avatar);
+            }
+    
             interaction.channel.send({ embeds: [winnerEmbed] });
             console.log("Hunger Games BR ended - Squad victory");
             workingHG = false;
             this.cleanupCollectors();
             return winningSquad;
         }
-        // Total elimination
+        // --- TOTAL ELIMINATION ---
         else if (aliveSquads.length === 0) {
             const ozzyEmbed = new EmbedBuilder()
-                .setTitle("**Battle Royale Ended**")
-                .setDescription("💀 All squads eliminated! Ozzy wins by default.")
+                .setTitle("💀 **Battle Royale Ended**")
+                .setDescription("All squads have been eliminated! **Ozzy** wins by default.")
                 .setColor(0x953d59)
                 .setThumbnail(ozzyAvatarURL);
-            
+    
             interaction.channel.send({ embeds: [ozzyEmbed] });
             console.log("Hunger Games BR ended - Ozzy victory");
             workingHG = false;
             this.cleanupCollectors();
             return "ozzy";
         }
-        
+    
         return null; // No winner yet
     }
 
@@ -776,27 +1080,25 @@ const GAME_EVENTS = {
 
 
                 const ringEmbed = new EmbedBuilder()
-                    .setTitle(`**Ring ${game.ring}: Discovery Phase**`)
+                    .setTitle(`**Ring ${game.ring}: Discovery Phase** 🛤`)
                     .setColor('#0099ff') // Optional: Set a color
                     .setFields(
                         // Create a field for each squad
                         ...[...game.squads.values()].map(squad => ({
-                        name: `${squad.name} (${squad.players[0].currentZone})`, // All squad members are in same zone
+                        name: `${squad.name} (${ZONES[squad.players[0]?.currentZone]?.name || 'Unknown Zone'}) ${squad.inDanger ? '🔴' : ''} `, // All squad members are in same zone
                         value: squad.players
                             .filter(player => player.alive)
                             .map(player => {
-                            const lastWeapon = player.weapons[player.weapons.length - 1]; // Get most recently found weapon
-                            return lastWeapon 
-                                ? lastWeapon.discovery(player) 
-                                : `${player.id} found nothing!`;
+                            //const lastWeapon = player.weapons[player.weapons.length - 1]; // Get most recently found weapon
+                            return player.lastDiscoveryMessage || `<@${player.id}> found nothing!`;
                             })
                             .join('\n'),
                         inline: false // Set to true if you want side-by-side squad displays
                         }))
                     )
                     .setFooter({
-                        text: `Safe Zones: ${game.safeZones.join(', ')}`,
-                    });
+                        text: `Safe Zones: ${game.safeZones.map(zoneKey => ZONES[zoneKey].name).join(', ')}`,
+                    })
 
                 
                 const message = await interaction.channel.send({
@@ -856,73 +1158,26 @@ const GAME_EVENTS = {
                             if(i.customId === 'next'){
 
                                 await i.deferUpdate();
+                                console.log("STARTING DAY TRANSITION");
+                                game.phase = 'battle';
 
-                                game.phase = 'stats';
-                                await deathMessage.edit({
+                                
+                                try {
+                                    await deathMessage.edit({
                                     embeds: [deathEmbed],
                                     components: [done]
-                                    
-                                });
-
-                                const statsEmbed = await game.statMessage();
-
-                                const statsMessage = await interaction.channel.send({
-                                    embeds: [statsEmbed],
-                                    components: [main],
-                                    fetchReply: true
-                                });
-        
-        
-        
-                                const statsCollector = statsMessage.createMessageComponentCollector({
-                                    filter: i => i.user.id === game.hoster,
-                                    time: 300000
-                                });
-        
-                                await game.collectors.push(statsCollector);
-
-                                statsCollector.on('end', async () => {
-
-                                    await statsMessage.edit({
-                                        embeds:[statsEmbed],
-                                        components:[done]
                                     });
-                
-                                    if(game.phase === 'stats'){ // stats timeout logic
-                                        await game.cleanupCollectors();
-                                        workingHG = false;
-                                        await interaction.channel.send({ embeds: [timeoutEmbed]});
-                                    }
-                                });
 
-                                statsCollector.on('collect', async i => {
-                                    if(i.customId === 'next'){
+                                    console.log("Before transitionTo");
 
-                                        await i.deferUpdate();
-                                        console.log("STARTING DAY TRANSITION");
-                                        game.phase = 'battle';
-
-                                        
-                                        try {
-                                            await statsMessage.edit({
-                                            embeds: [statsEmbed],
-                                            components: [done]
-                                            });
-
-                                            console.log("Before transitionTo");
-
-                                            await game.transitionTo('battle', interaction);
-                                            console.log("After transitionTo");
-                                        } catch(error){
-                                            console.error("Error during transitioning.", error);
-                                            workingHG = false;
-                                            game.cleanupCollectors();
-                                            interaction.channel.send({embeds: [crashEmbed]});
-                                        }    
-                                    }
-                                })
-
-
+                                    await game.transitionTo('battle', interaction);
+                                    console.log("After transitionTo");
+                                } catch(error){
+                                    console.error("Error during transitioning.", error);
+                                    workingHG = false;
+                                    game.cleanupCollectors();
+                                    interaction.channel.send({embeds: [crashEmbed]});
+                                }    
                             }
                         })
                     }
@@ -964,7 +1219,7 @@ const GAME_EVENTS = {
 
 
                 // Destructure the results:
-                const { battleLog, battleEmbed, casualties } = await game.battlePhase();;
+                const { battleEmbed, casualties } = await game.battlePhase();;
 
                 // In your main function where you call battlePhase():
 
@@ -1203,9 +1458,8 @@ export default  {
                     console.log(`test`);
 
                     let startEmbed = new EmbedBuilder()
-                        .setTitle("Hunger Games")
+                        .setTitle("HG Battle Royale 🔮")
                         .setDescription(`
-                            **Hunger Games Battle Royale**
                             Hosted by: <@${game.hoster}>
 
                             React with ${joinEmoji} to **Participate**
