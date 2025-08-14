@@ -637,7 +637,7 @@ class BattleRoyale {
     async updateLobbyMessage(message) {
         // Create squad fields
         const squadFields = [...this.squads.values()].map((squad, index) => {
-            const squadMembers = squad.players.map(player => 
+            const squadMembers = squad.players.map(player =>
                 `• <@${player.id}> ${player.id === this.hoster ? '(Host)' : ''}`
             ).join('\n');
     
@@ -652,8 +652,18 @@ class BattleRoyale {
         const lobbyEmbed = new EmbedBuilder()
             .setTitle('**HG Battle Royale Lobby** 🔮')
             .setColor('#00FF00')
-            .setDescription(`Waiting for players... (${this.players.size}/16)`)
-            .addFields(squadFields);
+            // --- MODIFIED ---
+            // Added the instructions to the main description
+            .setDescription(
+                `Hosted by: <@${this.hoster}>\n\n` +
+                `React with ${joinEmoji} to **Participate**\n` +
+                `React with ${addOzzyEmoji} to **Add Ozzy**\n` +
+                `React with ${startEmoji} to **Begin**`
+            )
+            .addFields(squadFields)
+            // --- NEW ---
+            // Moved the player count to the footer for a cleaner look
+            .setFooter({ text: `Players: ${this.players.size}/16` });
     
         // Edit the original message
         try {

@@ -1616,6 +1616,8 @@ class GameState {
             console.log(`Hunger games ended.`);
             workingHG = false;
             this.cleanupCollectors();
+
+            return true;
         
         } else if (alivePlayers.length === 0) {
 
@@ -1632,6 +1634,8 @@ class GameState {
             console.log(`Hunger games ended.`);
             workingHG = false;
             this.cleanupCollectors();
+
+            return true;
             
         }
         return null; // More than one player alive, no winner yet
@@ -1806,7 +1810,9 @@ const GAME_EVENTS = {
 
                                             console.log("Before transitionTo");
 
-                                            await game.transitionTo('day', interaction);
+                                            if (!game.checkWinner(interaction)) {
+                                                await game.transitionTo('day', interaction);
+                                            }
                                             console.log("After transitionTo");
                                         } catch(error){
                                             console.error("Error during transitioning.", error);
@@ -2018,6 +2024,7 @@ const GAME_EVENTS = {
                                             components: [done]
                                             
                                         });
+
 
                                         const statsEmbed = await game.statMessage();
 
@@ -2394,6 +2401,7 @@ const GAME_EVENTS = {
                                     
                                 });
 
+
                                 const statsEmbed = await game.statMessage();
 
                                 const statsMessage = await interaction.channel.send({
@@ -2439,27 +2447,26 @@ const GAME_EVENTS = {
                                             components: [done]
                                             });
 
+                                            if (game.checkWinner(interaction)) return;
+
                                             console.log("Before transitionTo");
 
-                                            if (!game.checkWinner(interaction)) {
+                                            if(game.round % 2 === 0){
+                                                const randomNimbooz = Math.floor(Math.random() * 2);
 
-                                                if(game.round % 2 === 0){
-                                                    const randomNimbooz = Math.floor(Math.random() * 2);
-
-                                                    if(randomNimbooz){
-                                                        game.phase = 'feast';
-                                                        await game.transitionTo('feast', interaction);
-                                                    } else {
-                                                        game.phase = 'bloodbath';
-                                                        await game.transitionTo('bloodbath', interaction);
-                                                    }
+                                                if(randomNimbooz){
+                                                    game.phase = 'feast';
+                                                    await game.transitionTo('feast', interaction);
                                                 } else {
-                                                    game.phase = 'day';
-                                                    await game.transitionTo('day', interaction);
-
+                                                    game.phase = 'bloodbath';
+                                                    await game.transitionTo('bloodbath', interaction);
                                                 }
-                                                
+                                            } else {
+                                                game.phase = 'day';
+                                                await game.transitionTo('day', interaction);
+
                                             }
+
 
                                             console.log("After transitionTo");
                                         } catch(error){
